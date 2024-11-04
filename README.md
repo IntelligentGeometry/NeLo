@@ -4,15 +4,12 @@ This work introduces a novel way for Laplacian operator estimation on point clou
 
 ![](img/teaser.jpg)
 
-- [1. Environment](#1-environment)
-
-- [2. Dataset](#2-Dataset)
-
-- [3. Training](#3-training)
-
-- [4. Inference](#4-inference)
-
-- [5. Citation](#5-citation)
+- [NeLo: Neural Laplacian Operators on Point Clouds](#nelo-neural-laplacian-operators-on-point-clouds)
+  - [1. Environment](#1-environment)
+  - [2. Dataset](#2-dataset)
+  - [3. Training](#3-training)
+  - [4. Inference](#4-inference)
+  - [5. Citation](#5-citation)
 
 We will continue to optimize & update this repo in the future. TODO list:
 
@@ -64,7 +61,7 @@ To train the model:
 python main.py --config config/global_config.py
 ```
 
-A pretrained checkpoint is provided on [Google Drive](https://arxiv.org/abs/2409.06506). Please put it in `out/checkpoints`. It was trained on a subset of ShapeNet objects. As a deep-learning based method, it may not generalize well on categories very different from the training set.
+A pretrained checkpoint is provided on [Google Drive](https://drive.google.com/file/d/1nHOTlJb_CFobOHN2MP9f8ILfoUkOg3hJ/view?usp=drive_link). Please put it in `out/checkpoints`. It was trained on a subset of ShapeNet objects. As a deep-learning based method, it may not generalize well on categories very different from the training set.
 
 ## 4. Inference
 

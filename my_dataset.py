@@ -40,11 +40,9 @@ def determine_cache_folder():
 
 class LapDataset(Dataset):
     """
-    注意现在的实现，是一股脑将所有的mesh都加载到内存中，然后再进行处理。
-    未来可能考虑使用 lazy loading 的方式，即只有在需要的时候才加载数据。
+    a dataset class for the laplacian dataset
     """
     def __init__(self, graph_trees: list[GraphTree] = None, graph_trees_names: list[str] = None):
-        # graph_trees_names: 包含了绝对路径的名字
         
         super().__init__()
 
@@ -68,7 +66,7 @@ class LapDataset(Dataset):
         # return: dict
         
         if global_config.preload_all_data_into_memory == True:
-            # 如果预先加载了所有数据到内存中，那么这里就直接返回就好了
+            # if the data is already loaded into memory, just return it
             graph_tree = self.graph_trees[idx]
             graph_tree.index_correction()
             return {
@@ -76,11 +74,10 @@ class LapDataset(Dataset):
             }
 
         else:
-            # 这就需要从硬盘中加载数据了。
-            # 首先拿到 idx 对应的 mesh 的名字
+            # load from the disk
             name = self.graph_trees_names[idx]
             
-            # TODO: 这样可能并不好。。。。。
+            # 
             if "train" in self.graph_trees_names[idx]:
                 is_train = True
             else:
@@ -130,13 +127,12 @@ def my_collate_func(batch: list[dict]) -> dict:
         # we merge graph_tree
         if each == "graph_tree":
             graphtree_super = GraphTree(batch_size=len(batch))
-            # 小发现：如果 num_workers = 0, 可以在下一句加上 .cuda()，能加速约 50% 
-            # 当天我就发现，不能这么搞，这会使得显存占用量暴增（因为可能放进显存内的东西没有被正确回收），导致程序崩溃。不过对于少数数据量较小(<1000)的数据集，这么搞还是勉强可以的。
+            
             if global_config.num_workers == 0 and False:
                 graph_tree_list = [b['graph_tree'].cuda() for b in batch]
             else:
                 graph_tree_list = [b['graph_tree'] for b in batch]
-            # TODO: merge graph tree 这一步的性能很差，需要调优
+            # TODO: merge graph tree may need some optimization to speed up
             graphtree_super.merge_graphtree(graph_tree_list)
             outputs['graph_tree'] = graphtree_super#.cuda()
         # merge real_eigenvectors / real_eigenvalues 
@@ -169,7 +165,7 @@ class MyLapDataset(pl.LightningDataModule):
                                             is_train: bool = True,
                                             ) -> None:
         """
-        预处理的操作：对数据集里所有的mesh进行处理，生成对应的 h_graph
+        
         """
         
         if is_train:
@@ -199,13 +195,13 @@ class MyLapDataset(pl.LightningDataModule):
         vertices = mesh.vertices
         faces = mesh.faces
         
-        # 对于使用 Wang 2016 的数据集的情况……
+        # for wang 2016 kinect dataset, we need to load the noisy mesh
         if global_config.using_wang_2016_kinect_dataset == True:
-            # 读取 noisy verts
+            # noisy verts
             noisy_mesh_path = mesh_path.replace("_meshes", "_noisy_meshes")
             noisy_mesh_path = noisy_mesh_path.replace(".obj", "_noisy.obj")
             noisy_mesh = trimesh.load(noisy_mesh_path, process=False)
-            vertices = noisy_mesh.vertices  # 用 noisy mesh 的顶点位置代替原始的顶点位置
+            vertices = noisy_mesh.vertices  # use noisy vertices
             
         elif gauss_noise_strength > 0.0:
             # add noise to the vertices, if needed
@@ -215,7 +211,7 @@ class MyLapDataset(pl.LightningDataModule):
         # generate graph tree!
         if global_config.train_graph_data_construt == "mesh":
             graph_tree = construct_graph_tree_from_mesh(vertices, faces)
-            assert global_config.use_data_augmentation_train == False, "此时的mesh的GT lap 就不准了"
+            assert global_config.use_data_augmentation_train == False 
         elif global_config.train_graph_data_construt == "pc":
             graph_tree = construct_graph_tree_from_point_cloud(vertices, ref_mesh=mesh, mesh_name=mesh_path)
         else:
@@ -229,7 +225,7 @@ class MyLapDataset(pl.LightningDataModule):
     
     def load_cached_h_graph(self, mesh_path: str, is_train:bool =True) -> GraphTree:
         """
-        加载已经缓存好的 h_graph
+        
         """        
         
         if is_train:
@@ -266,68 +262,6 @@ class MyLapDataset(pl.LightningDataModule):
                 graph_tree = pickle.load(f)
             return graph_tree
     
-    
-    def check_quality(self, threshold=2):
-        """
-        用损失函数测一测训练集里的 mesh 的损失，然后剔除掉损失大于阈值的
-        本函数假设所有 mesh 都已经被 cache pkl 了。
-        """
-        
-        per_mesh_loss = []
-        
-        # 准备工作
-        import src.modules.probe as probe
-        my_probe = probe.ProbeFunction()
-        from src.loss_funcs import vertexwise_loss as vertexwise_loss
-        
-        # get all names for train/val/test
-        names_train = os.listdir(self.data_path + "/train_meshes")[:3]
-        names_train = [os.path.join(self.data_path + "/train_meshes", name) for name in names_train if name.endswith(".obj")]
-        names_val = os.listdir(self.data_path + "/val_meshes")
-        names_val = [os.path.join(self.data_path + "/val_meshes", name) for name in names_val if name.endswith(".obj")]
-        names_test = os.listdir(self.data_path + "/test_meshes")
-        names_test = [os.path.join(self.data_path + "/test_meshes", name) for name in names_test if name.endswith(".obj")]
-        all_names = names_train + names_val + names_test
-        print("There are totally", len(all_names), "meshes in this dataset., among which", len(names_train), "in train, ", len(names_val), "in val, ", len(names_test), "in test.")
-        
-        for i, each in tqdm(enumerate(all_names)):
-            graph_tree = self.load_cached_h_graph(mesh_path=each, is_train=True)
-            graph_tree = graph_tree.cuda()
-            # 生成探针函数
-            vert_probe = my_probe.get_probe(graph_tree.real_underlying_graph, in_test=False, ref_graph_tree=graph_tree)
-            vert_probe = vert_probe * 100
-            # 得到真实的每条边的 lapacian（edge weight）
-            true_edge_lap = graph_tree.edge_weight
-            true_edge_lap = true_edge_lap.view(-1, 1)
-            # 得到每个顶点的质量。如果不使用质量，就直接设置为1
-            if global_config.use_vertex_mass == False:
-                graph_tree.vertex_mass = torch.ones_like(graph_tree.vertex_mass)
-                vert_mass_predicted = torch.ones_like(vert_mass_predicted)
-                
-            # 计算探针函数经过真实的拉普拉斯算子后的结果
-            vertex_mass = torch.clamp(graph_tree.vertex_mass, 0.1, 999)
-            after_lap_real = my_probe.lap_times_probe(graph_tree.real_underlying_graph, vert_probe, true_edge_lap, vertex_mass=vertex_mass, automatic_add_self_loop=True)
-            # 假设探针函数经过预测的拉普拉斯算子后的结果为全零
-            after_lap_pred = torch.zeros_like(after_lap_real)
-            
-            # 拿到这个 mesh 的 loss —— 其实就是看一看全0的结果会有多少loss
-            loss = vertexwise_loss(after_lap_pred, after_lap_real)["loss_total"]
-            per_mesh_loss.append(float(loss))
-
-        per_mesh_loss = np.array(per_mesh_loss)
-        print("Analysis over. For this dataset, loss mean/max/min:", per_mesh_loss.mean(), per_mesh_loss.max(), per_mesh_loss.min())
-        print(f"totally, {(per_mesh_loss>threshold).sum()} will be deleted.")
-        # 统计 train、val、test 里各有多少个要删除的
-        print(f"Among them, {(per_mesh_loss[:len(names_train)]>threshold).sum()} in train, {(per_mesh_loss[len(names_train):len(names_train)+len(names_val)]>threshold).sum()} in val, {(per_mesh_loss[len(names_train)+len(names_val):]>threshold).sum()} in test.")
-        
-        print(f"Type 'y' to delete the meshes/pkl with > {threshold} loss! (please backup the data first!)")
-        input_message = input("Please type y to delete, or other to abort")
-        if input_message == 'y':
-            for i, each in tqdm(enumerate(all_names)):
-                if per_mesh_loss[i] > threshold:
-                    print("Deleting", each)
-                    os.remove(each)
-        print("Finshed!")
     
     
     def cache_pkl(self):
@@ -424,10 +358,9 @@ class MyLapDataset(pl.LightningDataModule):
                 self.names_test.append(name)
         
         ################################################
-        # 重要分歧点
         ################################################
         if global_config.preload_all_data_into_memory == True: 
-            # 加载所有数据到内存中。这会使得内存占用量暴增，但是会加速训练。
+            # load all the data into memory will be much faster, but will consume more memory
                     
             # put them into memory
             for name in tqdm(self.names_train):
@@ -459,9 +392,9 @@ class MyLapDataset(pl.LightningDataModule):
             
             
         else:
-            # 如果不预先加载到内存，那这里就不加载了，直接在 dataloader 里加载
+            # lazy loading the data
             
-            # 根据load ratio 丢弃一些数据
+            # if the load_ratio is not 1.0, we need to sample a subset of the data
             if self.load_ratio < 1.0:
                 if self.load_ratio < 0.0:
                     raise RuntimeError("load_ratio should be in [0.0, 1.0]")
@@ -470,7 +403,7 @@ class MyLapDataset(pl.LightningDataModule):
                 self.names_test = self.names_test[:int(len(self.names_test) * self.load_ratio)]
             elif self.load_ratio > 1.0:
                 self.load_ratio = 1.0
-            # 打印一个相对简单的统计信息
+            #
             # get the index of the current gpu
             current_gpu_idx = torch.cuda.current_device()
             # only print the info on the first gpu
