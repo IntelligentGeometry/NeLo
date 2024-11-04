@@ -88,7 +88,7 @@ title={Neural Laplacian Operator for 3D Point Clouds},
 
 author={Pang, Bo and Zheng, Zhongtian and Li, Yilong and Wang, Guoping and Wang, Peng-Shuai},
 
-journal={arXiv preprint arXiv:2409.06506},
+journal={ACM Transactions on Graphics (SIGGRAPH Asia)},
 
 year={2024}
 
