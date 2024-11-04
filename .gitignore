@@ -1,0 +1,8 @@
+
+out
+tb_logs
+raw_data
+processed_data
+
+*__pycache__*
+
