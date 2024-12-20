@@ -1,6 +1,11 @@
 # NeLo: Neural Laplacian Operators on Point Clouds
 
-This work introduces a novel way for Laplacian operator estimation on point clouds. Please refer to our paper for more details: [arxiv](https://arxiv.org/abs/2409.06506).
+This work introduces a novel way for Laplacian operator estimation on point clouds.
+
+[**Neural Laplacian Operator for 3D Point Clouds**](https://arxiv.org/abs/2409.06506) <br/>
+[Bo Pang](https://github.com/skinboC), [Zhongtian Zheng](https://github.com/zzttzz), Yilong Li, [Guoping Wang](https://cs.pku.edu.cn/info/1230/2021.htm), and [Peng-Shuai Wang](https://wang-ps.github.io/) <br/>
+ACM Transactions on Graphics (SIGGRAPH Asia), 43(6), 2024
+
 
 ![](img/teaser.jpg)
 
@@ -83,15 +88,10 @@ If you find this project useful for your research, please kindly cite our paper:
 
 ```
 @article{pang2024neural,
-
-title={Neural Laplacian Operator for 3D Point Clouds},
-
-author={Pang, Bo and Zheng, Zhongtian and Li, Yilong and Wang, Guoping and Wang, Peng-Shuai},
-
-journal={ACM Transactions on Graphics (SIGGRAPH Asia)},
-
-year={2024}
-
+  title={Neural Laplacian Operator for 3D Point Clouds},
+  author={Pang, Bo and Zheng, Zhongtian and Li, Yilong and Wang, Guoping and Wang, Peng-Shuai},
+  journal={ACM Transactions on Graphics (SIGGRAPH Asia)},
+  year={2024}
 }
 ```
 
